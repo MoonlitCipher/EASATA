@@ -76,6 +76,15 @@ show("Counterfactual", [(x["feature"], x["from"], "->", x["to"]) for x in d["cou
 for w in d["what_changed"]:
     show(f"What changed? ({w['family']})", f"{w['original_score']:.3f} -> {w['hypothetical_score']:.3f}  [{w['note']}]")
 
+h("2b. NVIDIA Nemotron on Nebius Token Factory (Agentic Reasoning & Verifier)")
+nem_cust = ok(c.post(f"/api/alerts/{a['transaction_id']}/nemotron/customer-message", headers=OPS))
+show("Customer alert rewrite", f"source={nem_cust['source']} | verified={nem_cust['verified']} | leakage_passed={nem_cust['leakage_passed']}")
+show("Message text", nem_cust["customer_message"])
+
+nem_memo = ok(c.post(f"/api/alerts/{a['transaction_id']}/nemotron/case-memo", headers=OPS))
+show("Forensic case memo", f"source={nem_memo['source']} | verified={nem_memo['verified']} | model={nem_memo['model']}")
+print(textwrap.indent(nem_memo["case_memo"][:300] + "...", "    | "))
+
 h("3. Bank sends 'Was this you?' (customer-safe wording, single-use link)")
 ok(c.post(f"/api/ops/alerts/{a['transaction_id']}/notify", headers=OPS))
 token, body = token_from_inbox()

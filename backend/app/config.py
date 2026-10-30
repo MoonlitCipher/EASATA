@@ -72,6 +72,10 @@ class Settings:
 
         # Adaptive friction. Empty = derived from the bundle at startup (see decision.py).
         self.expected_loss_high = float(_env("EXPECTED_LOSS_HIGH", "0") or 0)
+        self.nebius_api_key = _env("NEBIUS_API_KEY", "")
+        self.nebius_base_url = _env("NEBIUS_BASE_URL", "https://api.studio.nebius.ai/v1").rstrip("/")
+        self.nebius_model = _env("NEBIUS_MODEL", "nvidia/Llama-3.1-Nemotron-70B-Instruct")
+        self.tavily_api_key = _env("TAVILY_API_KEY", "")
 
     def resolve_ops_key(self) -> str:
         if self.ops_api_key:

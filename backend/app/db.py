@@ -123,6 +123,22 @@ CREATE TABLE IF NOT EXISTS idempotency (
   created_at  TEXT NOT NULL,
   PRIMARY KEY (key, endpoint)
 );
+
+CREATE TABLE IF NOT EXISTS nemotron_generations (
+  id              INTEGER PRIMARY KEY,
+  transaction_id  TEXT NOT NULL,
+  generation_type TEXT NOT NULL CHECK (generation_type IN ('customer_message', 'case_memo')),
+  source          TEXT NOT NULL CHECK (source IN ('nemotron', 'template')),
+  model           TEXT NOT NULL,
+  output_text     TEXT NOT NULL,
+  latency_ms      REAL NOT NULL,
+  tokens          INTEGER,
+  verified        INTEGER NOT NULL,
+  leakage_passed  INTEGER NOT NULL,
+  fallback_reason TEXT,
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_nemotron_txn ON nemotron_generations(transaction_id);
 """
 
 _local = threading.local()

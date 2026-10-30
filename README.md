@@ -217,7 +217,71 @@ always serves the bundle's own `evaluation.json`.
 
 (`python scripts/demo_flow.py` runs this story against the API and prints each step.)
 
-## Tests (31)
+## NVIDIA Nemotron on Nebius Token Factory
+
+EASATA combines high-speed tabular fraud detection with generative agentic reasoning through a hybrid architecture:
+
+```mermaid
+flowchart LR
+  subgraph detect[1. Detection · Tabular ML]
+    txn[Transaction] --> catboost[CatBoost + TreeSHAP]
+    catboost --> math[Calibrated risk + Log-odds]
+  end
+
+  subgraph guard[2. Guardrail · Truth Verifier]
+    math --> verifier[reasons.verify & Leakage Guard]
+  end
+
+  subgraph reason[3. Reasoning · Nebius Token Factory]
+    verifier <-->|OpenAI API| nemotron[NVIDIA Nemotron-70B
+Serverless on H100 / L40S]
+  end
+
+  subgraph output[4. Verified Outputs]
+    nemotron --> cust[Customer-Safe Alert]
+    nemotron --> memo[Bank Forensic Memo]
+  end
+```
+
+### Why NVIDIA Nemotron-70B?
+- **Model:** `nvidia/Llama-3.1-Nemotron-70B-Instruct` (configurable via `NEBIUS_MODEL`).
+- **High-Fidelity Reasoning:** Built for complex agentic workflows with leading benchmark scores in multi-step reasoning, mathematical accuracy, and instruction-following.
+- **Negative Constraint Adherence:** In financial alerting, the model must **never reveal internal risk scores, thresholds, or SHAP log-odds** to the cardholder. Nemotron-70B excels at respecting strict negative guardrails where smaller models often hallucinate or leak internals.
+- **Regulatory Case Memorandums:** Synthesizes point-in-time velocity, TreeSHAP contributions, and counterfactuals into formal audit memos compliant with the Reserve Bank of India (RBI) Zero-Liability framework (3-day customer notification deadline, 10-day provisional credit, 90-day resolution).
+
+### Why Nebius Token Factory?
+- **Zero-DevOps GPU Inference:** Provides managed, high-throughput serverless endpoints powered by NVIDIA H100 and L40S clusters.
+- **Predictable Low Latency:** Delivers sub-second token latency crucial for real-time payment decisioning without managing complex Triton or vLLM deployments.
+- **OpenAI-Compatible API:** Plug-and-play integration using standard HTTP clients (`httpx`).
+
+### Truth Verifier: The Mathematical Guardrail
+Generative LLMs risk hallucinating financial figures. EASATA eliminates this via `backend/app/reasons.py`:
+1. **Leakage Pre/Post-Scan:** Rejects any customer text containing banned terms (`score`, `threshold`, `probability`, `shap`, `anomaly`, etc.) or raw probabilities.
+2. **Deterministic Evidence Check:** Every numeric token in Nemotron's output is re-verified against ground-truth transaction evidence. If an invented number is detected, EASATA automatically rejects the output and falls back to deterministic templates (`source: "template"`).
+
+### Endpoints
+- `POST /api/alerts/{id}/nemotron/customer-message`: Customer alert rewrite with leakage & verifier guards.
+- `POST /api/alerts/{id}/nemotron/case-memo`: Formal forensic case memorandum with RBI SLA alignment.
+
+### Environment Variables & Setup
+Set in `backend/.env` (or cloud secrets in `render.yaml`):
+```bash
+NEBIUS_API_KEY="your-nebius-token-factory-key"
+NEBIUS_BASE_URL="https://api.studio.nebius.ai/v1"
+NEBIUS_MODEL="nvidia/Llama-3.1-Nemotron-70B-Instruct"
+# Optional Tavily API key for real-time merchant scam/reputation lookup:
+TAVILY_API_KEY="tvly-your-key"
+```
+
+### Running the Live Evaluation Script
+To evaluate Nemotron across 50 high-risk alerts:
+```bash
+cd backend
+python scripts/eval_nemotron.py
+```
+*(If `NEBIUS_API_KEY` is not set, the script exits cleanly without fabricating numbers).*
+
+## Tests (38)
 
 `python -m pytest -q` checks:
 - the bundle reproduces saved scores, and the alert flag matches the notebook;
@@ -231,7 +295,8 @@ always serves the bundle's own `evaluation.json`.
 - case transitions are valid, audit rows can't be changed, and working-day deadlines are correct;
 - decision bands, trusted-pattern lowering, revocation and expiry work;
 - pending simulation writes nothing; committed simulation updates history;
-- idempotency keys, structured validation errors, rate limits and the dashboards work.
+- idempotency keys, structured validation errors, rate limits and the dashboards work;
+- Nemotron missing-key fallback, timeout fallback, leakage-guard rejection, verifier rejection of invented numbers, success path, case memo generation, and ops authorization work.
 
 ## Limitations
 
@@ -247,3 +312,7 @@ always serves the bundle's own `evaluation.json`.
 - **Single-process demo**: the in-memory rate limiter and SQLite suit one server. Production would use PostgreSQL,
   a shared rate limiter, real authentication for analysts, and a real SMS/email provider.
 - **Trusted patterns** are coarse (merchant category × domestic/international × device type).
+
+## License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
